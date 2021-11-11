@@ -19,7 +19,6 @@ from numpy.linalg import multi_dot
 
 
 
-
 #old code reverse, forward, right, left, turn not used 
 move = 0.0
 stop = 1.0
@@ -220,7 +219,7 @@ class ekf:
         self.loc[1]+=v*sin(w*dt)
         self.loc[2]+=w*dt
 
-    #⌃t|t1 = Ft ⌃t1|t1F Tt + Wt Qt1W,, predicition step 2(ppt)
+    #predicition step 1(ppt) t|t1 = Ft t1|t1F Tt + Wt Qt1W T
     def update_cov(self,v,w,dt):
         x=self.loc[0]
         y=self.loc[1]
@@ -229,7 +228,7 @@ class ekf:
         Gx= Matrix([[x-r*sympy.sin(theta)+r*sympy.sin(theta+w*dt)],[y+r*sympy.cos(theta)-r*sympy.cos(theta+w*dt)],[theta+w*dt]])
         G=Gx.jacobian(Matrix([x, y, theta]))
         G=array(self.G.evalf()).astype(float)
-        self.corr=G @ self.corr @ G.T + self.R
+        self.corr=multi_dot([G,self.corr, G.T]) + self.R
         file1 = open("covarance.txt", "a") 
         file1.write(array(self.corr).astype(float))
         file1.close()
@@ -271,9 +270,9 @@ class ekf:
                 h_j=ekf.H_K(i)
                 h_jt=h_j.transpose()
                 hof=ekf.Hof(i)
-                k=self.corr @ h_jt * inv(h_j @ self.corr @ h_jt + self.Q)
+                k=multi_dot([self.corr,h_jt]) * inv(multi_dot([h_j, self.corr,h_jt]) + self.Q)
                 self.loc=self.loc + k*(z-hof)
-                self.corr=np.identity(len(k)-1)- (k @ h_j) @ self.corr
+                self.corr=np.identity(len(k)-1)- multi_dot([multi_dot([k, h_j]), self.corr])
             else:
                 self.x.append(i[0],i[1])
                 np.pad(self.corr, ((0,2),(0,2)), mode='constant', constant_values=0)
@@ -295,8 +294,9 @@ class motion:
         # self.cur_wt = 0
         # self.waypoints = waypoints
         # self.step = 0.10
+        self.dt=1
         self.control_obj = control()
-        self.ekf_obj=ekf()
+        self.ekf_obj=ekf(self.dt)
         self.dt=1
         self.mover()
     
@@ -360,8 +360,8 @@ class motion:
             # to_move = angle(final_pos[1] - curren_xy[1], final_pos[0] - curren_xy[0]) - curren_angle
             # to_move = abs(to_move) % (math.pi * 2) * to_move / (abs(theta + 10**-10))
             # if(abs(distance)>0.05):
-            v, t1 = cal_v(distance * 0.10, self.step, -1)
-            o, t2 = cal_w(to_move * max(distance, 0.50) * 0.3, self.step)
+            v, t1 = cal_v(distance * 0.10, self.dt, -1)
+            o, t2 = cal_w(to_move * max(distance, 0.50) * 0.3, self.dt)
             self.control_obj.wv_m(v, -o * 2, (t1 + t2) / 2)
             self.ekf_obj.update_pos(v,o,self.dt)
             self.ekf_obj.update_cov(v,o,self.dt)
