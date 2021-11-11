@@ -211,6 +211,7 @@ class ekf:
         self.Q=np.eye(2)
         self.R[0,0]=0.02
         self.R[1,1]=0.07
+        self.flist=[]
         # self.v, self.a, self.theta = v, a, theta
 
     # st|t1 = f (st1|t1,ut1,0), predicition step 1(ppt)
@@ -228,7 +229,7 @@ class ekf:
         Gx= Matrix([[x-r*sympy.sin(theta)+r*sympy.sin(theta+w*dt)],[y+r*sympy.cos(theta)-r*sympy.cos(theta+w*dt)],[theta+w*dt]])
         G=Gx.jacobian(Matrix([x, y, theta]))
         G=array(self.G.evalf()).astype(float)
-        self.corr=multi_dot([G,self.corr, G.T]) + self.R
+        self.corr=multi_dot([G,self.corr, G.T]) + self.Q
         file1 = open("covarance.txt", "a") 
         file1.write(array(self.corr).astype(float))
         file1.close()
@@ -251,7 +252,6 @@ class ekf:
 
         H = array([[-(x_i - x[0, 0]) / dist, -(y_i - x[1, 0]) / dist, 0],[ (y_i - x[1, 0]) / hyp,  -(x_i - x[0, 0]) / hyp, -1]])
         return H
-    from math import atan2
 
     #to get h(st|t1,0)
     def Hof(self, i):
@@ -261,20 +261,37 @@ class ekf:
         dist = sqrt((px - x[0, 0])**2 + (py - x[1, 0])**2)
         Hof = array([[dist],[atan2(py - x[1, 0], px - x[0, 0]) - x[2, 0]]])
         return Hof
+    
+    #to check threshold between landmarks
+    def threshold_check(self,new):
+        if(self.flist==[]):return(False)
+        for j in self.flist:
+            for i in new:
+                if(i[0]==j[0]):
+                    # if(abs(i[1]-j[1])<0.3) and (abs(abs(i[3])-abs(j[3]))<0.34):
+                    if (abs(abs(i[3])-abs(j[3]))<0.34) or (abs(abs(i[2])-abs(j[2]))<0.34):
+                        return(True)
+                    else:
+                        return(False)
+                else:
+                    return(False)
+
 
     #Measurement update computation
     def correct(self,f):
         for i in f:
-            if i['id'] in self.flist:
+            check=self.threshold_check(i,f)
+            if check:
                 z=ekf.zval(i)
                 h_j=ekf.H_K(i)
                 h_jt=h_j.transpose()
                 hof=ekf.Hof(i)
-                k=multi_dot([self.corr,h_jt]) * inv(multi_dot([h_j, self.corr,h_jt]) + self.Q)
+                k=multi_dot([self.corr,h_jt]) * inv(multi_dot([h_j, self.corr,h_jt]) + self.R)
                 self.loc=self.loc + k*(z-hof)
                 self.corr=np.identity(len(k)-1)- multi_dot([multi_dot([k, h_j]), self.corr])
             else:
-                self.x.append(i[0],i[1])
+                self.flist.append(i)
+                self.loc.append(i[0],i[1])
                 np.pad(self.corr, ((0,2),(0,2)), mode='constant', constant_values=0)
                 self.corr[len(self.corr)-2,len(self.corr)-2]=self.R[0,0]
                 self.corr[len(self.corr)-1,len(self.corr)-1]=self.R[1,1]
@@ -314,7 +331,7 @@ class motion:
                     x=round(translation[2],1)
                     y=-round(translation[0],1)
                     r=np.sqrt(x**2+y**2)
-                    theta=math.atan(y/z)
+                    theta=math.atan(y/x)
                     current_angle=round(rotat_to_euler(rotation)[1],2)
                     f_i.append([f_i,r,theta,current_angle])
                     ids.append(apriltag_id)
@@ -342,7 +359,6 @@ class motion:
      
     #circle motion(additional step for 8 motion)
     def mover(self):
-        rospy.Subscriber("/current_pose", Pose, self.pose_callback)  
         i=1
         while(i<=24):
             # curren_xy=self.current_xy
@@ -362,6 +378,7 @@ class motion:
             # if(abs(distance)>0.05):
             v, t1 = cal_v(distance * 0.10, self.dt, -1)
             o, t2 = cal_w(to_move * max(distance, 0.50) * 0.3, self.dt)
+            rospy.Subscriber("/current_pose", Pose, self.pose_callback)  
             self.control_obj.wv_m(v, -o * 2, (t1 + t2) / 2)
             self.ekf_obj.update_pos(v,o,self.dt)
             self.ekf_obj.update_cov(v,o,self.dt)
