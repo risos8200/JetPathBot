@@ -296,6 +296,7 @@ class motion:
         self.control_obj = control()
         self.ekf_obj=ekf()
         self.dt=1
+        self.mover()
     
     #to get data from april tags data
     def pose_callback(self,msg):
@@ -367,7 +368,7 @@ class motion:
 
         # # additional step for 8 motion
         # while(i<=24):
-        #     distance=0.2
+        #     distance=0.16
         #     to_move=-0.78
         #     v, t1 = cal_v(distance * 0.10, self.step, -1)
         #     o, t2 = cal_w(to_move * max(distance, 0.50) * 0.3, self.step)
@@ -389,7 +390,7 @@ class motion:
             t = abs(dif) / abs(i)
             if nextwp[2] == 0:
                 omeganow = 0.0
-            print('roatation',thetadiff, omeganow, timenow)
+            print('rotation',thetadiff, omeganow, timenow)
             self.control_obj.wv_m(0, -omeganow, timenow + additional_startup_time)
             self.cur_wt += 1
             self.reached=False
@@ -456,5 +457,5 @@ if __name__ == "__main__":
 
     # time.sleep(1)
     # while(i<24):
-    motion.mover()
+    motion()
     rospy.spin()
