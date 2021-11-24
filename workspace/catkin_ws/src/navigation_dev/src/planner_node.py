@@ -121,7 +121,7 @@ class control:
         direction = 0
         if p > 0.5:
             direction = 1
-            return (phi - self.wheel_params['pos']['intercept']) / self.wheel_params['pos']['slope']
+            return (p - self.wheel_params['pos']['intercept']) / self.wheel_params['pos']['slope']
         if p < -0.5:
             direction = -1
             return (p - self.wheel_params['neg']['intercept']) / self.wheel_params['neg']['slope']
@@ -129,11 +129,9 @@ class control:
             return 0
 
     def wv_m(self, v, w, d):
-        p_r = w * self.wheel_params['L'] / \
-            (2 * self.wheel_params['R']) + v / self.wheel_params['R']
-        p_l = -w * self.wheel_params['L'] / \ 
-            (2 * self.wheel_params['R']) + v / self.wheel_params['R']
-        motor_l, motor_r = self.p_m(ph_l), self.p_m(ph_r)
+        p_r = w * self.wheel_params['L'] / (2 * self.wheel_params['R']) + v / self.wheel_params['R']
+        p_l = -w * self.wheel_params['L'] / (2 * self.wheel_params['R']) + v / self.wheel_params['R']
+        motor_l, motor_r = self.p_m(p_l), self.p_m(p_r)
         step = int(d / self.step)
         total_t= 0.0
         while total_t <= d:
@@ -141,7 +139,7 @@ class control:
             msg.data = [self.move, -motor_l * self.l_to_r, -motor_r]
             self.pub.publish(msg)
             time.sleep(self.step)
-            total_time += self.step
+            total_t += self.step
         msg = Float32MultiArray()
         msg.data = [self.stop, -0.45, -0.45]
         self.pub.publish(msg)
