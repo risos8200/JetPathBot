@@ -204,11 +204,11 @@ class ekf:
 
         self.loc=[0,0,0]
         self.corr=np.zeros((3,3))
-        self.R=np.eye(3)
-        self.R[0,0]=0.25
-        self.R[1,1]=0.25
-        self.R[0,0]=0.55
-        self.Q=np.eye(2)
+        self.Q=np.eye(3)
+        self.Q[0,0]=0.25
+        self.Q[1,1]=0.25
+        self.Q[3,3]=0.55
+        self.R=np.eye(2)
         self.R[0,0]=0.02
         self.R[1,1]=0.07
         self.flist=[]
